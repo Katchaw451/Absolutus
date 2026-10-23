@@ -1,0 +1,26 @@
+# Build artifacts
+build/
+*.o
+*.out
+*.so
+*.a
+
+# Runtime output
+results/*.csv
+results/*.dat
+logs/*.log
+
+# Editor and OS noise
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+
+# Local configs that should not be shared
+configs/local_*.json
+
+# Keep directory structure tracked even when empty
+!results/.gitkeep
+!logs/.gitkeep
+!build/.gitkeep
