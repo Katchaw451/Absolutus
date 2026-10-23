@@ -1,0 +1,115 @@
+#include "ml/minilm.hpp"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <stdexcept>
+
+namespace absolutus {
+namespace ml {
+
+static bool all_finite(const std::vector<double>& v) {
+    for (double x : v) if (!std::isfinite(x)) return false;
+    return true;
+}
+
+MiniLM::MiniLM(size_t sl, size_t dm, size_t dff, size_t vs,
+               size_t nblocks, std::mt19937_64& rng, double mom)
+    : seq_len(sl), d_model(dm), d_ff(dff), vocab_size(vs), n_blocks(nblocks),
+      momentum(mom),
+      embed(vs * dm), dembed(vs * dm, 0.0),
+      pe(sl, dm),
+      head(dm, vs, Activation::Linear, rng, mom),
+      h0_(sl * dm, 0.0), logits_(sl * vs, 0.0),
+      cur_(sl * dm, 0.0), grad_h0_(sl * dm, 0.0) {
+    std::normal_distribution<double> dist(0.0, 0.1);
+    for (auto& e : embed) e = dist(rng);
+    blocks.reserve(nblocks);
+    for (size_t b = 0; b < nblocks; ++b)
+        blocks.emplace_back(sl, dm, dff, rng, true, mom);
+}
+
+const std::vector<double>& MiniLM::forward(const std::vector<size_t>& tokens) {
+    if (tokens.size() != seq_len)
+        throw std::invalid_argument("MiniLM::forward: token count");
+    tokens_ = tokens;
+
+    for (size_t t = 0; t < seq_len; ++t)
+        for (size_t i = 0; i < d_model; ++i)
+            h0_[t*d_model + i] = embed[tokens[t]*d_model + i] + pe.table[t*d_model + i];
+
+    if (!all_finite(h0_)) {
+        std::fprintf(stderr, "DBG: NaN in h0_ (embed + PE)\n");
+        for (size_t i = 0; i < h0_.size(); ++i)
+            if (!std::isfinite(h0_[i]))
+                std::fprintf(stderr, "  h0_[%zu]=%g\n", i, h0_[i]);
+        return logits_;
+    }
+
+    cur_ = h0_;
+    for (size_t b = 0; b < blocks.size(); ++b) {
+        cur_ = blocks[b].forward(cur_);
+        if (!all_finite(cur_)) {
+            std::fprintf(stderr, "DBG: NaN after block %zu\n", b);
+            for (size_t i = 0; i < cur_.size(); ++i)
+                if (!std::isfinite(cur_[i])) {
+                    std::fprintf(stderr, "  cur_[%zu]=%g\n", i, cur_[i]);
+                    break;
+                }
+            return logits_;
+        }
+    }
+
+    for (size_t t = 0; t < seq_len; ++t) {
+        std::vector<double> v(cur_.begin() + t*d_model, cur_.begin() + (t+1)*d_model);
+        auto lg = head.forward(v);
+        if (!all_finite(lg)) {
+            std::fprintf(stderr, "DBG: NaN in head output at token %zu\n", t);
+            for (size_t i = 0; i < lg.size(); ++i)
+                std::fprintf(stderr, "  lg[%zu]=%g  v[%zu]=%g\n",
+                             i, lg[i], i, v[i]);
+            return logits_;
+        }
+        std::copy(lg.begin(), lg.end(), logits_.begin() + t*vocab_size);
+    }
+    return logits_;
+}
+
+void MiniLM::backward(const std::vector<double>& grad_logits) {
+    if (grad_logits.size() != seq_len * vocab_size)
+        throw std::invalid_argument("MiniLM::backward: grad shape");
+
+    std::fill(head.dW.begin(), head.dW.end(), 0.0);
+    std::fill(head.db.begin(), head.db.end(), 0.0);
+    std::vector<double> acc_head_dW(head.W.size(), 0.0);
+    std::vector<double> acc_head_db(head.b.size(), 0.0);
+    std::vector<double> grad_cur(seq_len * d_model, 0.0);
+
+    for (size_t t = 0; t < seq_len; ++t) {
+        std::vector<double> g(grad_logits.begin() + t*vocab_size,
+                              grad_logits.begin() + (t+1)*vocab_size);
+        std::vector<double> v(cur_.begin() + t*d_model, cur_.begin() + (t+1)*d_model);
+        head.forward(v);
+        auto g_v = head.backward(g);
+        for (size_t i = 0; i < head.dW.size(); ++i) acc_head_dW[i] += head.dW[i];
+        for (size_t i = 0; i < head.db.size(); ++i) acc_head_db[i] += head.db[i];
+        for (size_t i = 0; i < d_model; ++i) grad_cur[t*d_model + i] = g_v[i];
+    }
+    std::copy(acc_head_dW.begin(), acc_head_dW.end(), head.dW.begin());
+    std::copy(acc_head_db.begin(), acc_head_db.end(), head.db.begin());
+
+    for (auto it = blocks.rbegin(); it != blocks.rend(); ++it)
+        grad_cur = it->backward(grad_cur);
+
+    std::fill(dembed.begin(), dembed.end(), 0.0);
+    for (size_t t = 0; t < seq_len; ++t)
+        for (size_t i = 0; i < d_model; ++i)
+            dembed[tokens_[t]*d_model + i] += grad_cur[t*d_model + i];
+}
+
+void MiniLM::update(double lr) {
+    for (size_t i = 0; i < embed.size(); ++i) embed[i] -= lr * dembed[i];
+    for (auto& b : blocks) b.update(lr);
+    head.update(lr);
+}
+
+}}
