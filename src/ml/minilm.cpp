@@ -12,6 +12,14 @@ static bool all_finite(const std::vector<double>& v) {
     return true;
 }
 
+static void diagnose(const char* stage, const std::vector<double>& v) {
+    for (size_t i = 0; i < v.size(); ++i)
+        if (!std::isfinite(v[i])) {
+            std::fprintf(stderr, "DBG: NaN in %s at index %zu = %g\n", stage, i, v[i]);
+            break;
+        }
+}
+
 MiniLM::MiniLM(size_t sl, size_t dm, size_t dff, size_t vs,
                size_t nblocks, std::mt19937_64& rng, double mom)
     : seq_len(sl), d_model(dm), d_ff(dff), vocab_size(vs), n_blocks(nblocks),
@@ -38,24 +46,16 @@ const std::vector<double>& MiniLM::forward(const std::vector<size_t>& tokens) {
             h0_[t*d_model + i] = embed[tokens[t]*d_model + i] + pe.table[t*d_model + i];
 
     if (!all_finite(h0_)) {
-        std::fprintf(stderr, "DBG: NaN in h0_ (embed + PE)\n");
-        for (size_t i = 0; i < h0_.size(); ++i)
-            if (!std::isfinite(h0_[i]))
-                std::fprintf(stderr, "  h0_[%zu]=%g\n", i, h0_[i]);
-        return logits_;
+        diagnose("h0_", h0_);
+        throw std::runtime_error("MiniLM::forward: NaN in h0_");
     }
 
     cur_ = h0_;
     for (size_t b = 0; b < blocks.size(); ++b) {
         cur_ = blocks[b].forward(cur_);
         if (!all_finite(cur_)) {
-            std::fprintf(stderr, "DBG: NaN after block %zu\n", b);
-            for (size_t i = 0; i < cur_.size(); ++i)
-                if (!std::isfinite(cur_[i])) {
-                    std::fprintf(stderr, "  cur_[%zu]=%g\n", i, cur_[i]);
-                    break;
-                }
-            return logits_;
+            diagnose("cur_ after block " + std::to_string(b), cur_);
+            throw std::runtime_error("MiniLM::forward: NaN after block " + std::to_string(b));
         }
     }
 
@@ -63,11 +63,8 @@ const std::vector<double>& MiniLM::forward(const std::vector<size_t>& tokens) {
         std::vector<double> v(cur_.begin() + t*d_model, cur_.begin() + (t+1)*d_model);
         auto lg = head.forward(v);
         if (!all_finite(lg)) {
-            std::fprintf(stderr, "DBG: NaN in head output at token %zu\n", t);
-            for (size_t i = 0; i < lg.size(); ++i)
-                std::fprintf(stderr, "  lg[%zu]=%g  v[%zu]=%g\n",
-                             i, lg[i], i, v[i]);
-            return logits_;
+            diagnose("head out at token " + std::to_string(t), lg);
+            throw std::runtime_error("MiniLM::forward: NaN in head output");
         }
         std::copy(lg.begin(), lg.end(), logits_.begin() + t*vocab_size);
     }
