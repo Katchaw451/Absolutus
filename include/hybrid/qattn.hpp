@@ -1,4 +1,5 @@
 #pragma once
+#include "ml/attention_iface.hpp"
 #include "hybrid/qlayer.hpp"
 #include "ml/mlp.hpp"
 #include <random>
@@ -19,7 +20,7 @@ namespace hybrid {
 //   - Classical path (K, V, and pre_q's Dense): backprop
 //   - Quantum path (ql.theta): parameter-shift via ql.backward
 // Both compose in a single backward pass through the attention math.
-class QuantumAttention {
+class QuantumAttention : public ml::AttentionIface {
 public:
     size_t seq_len, d_model, n_qubits;
     double momentum;
@@ -32,9 +33,9 @@ public:
                      size_t ql_layers, std::mt19937_64& rng,
                      double momentum_ = 0.9);
 
-    const std::vector<double>& forward(const std::vector<double>& X);
-    std::vector<double> backward(const std::vector<double>& grad_out);
-    void update(double lr);
+    const std::vector<double>& forward(const std::vector<double>& X) override;
+    std::vector<double> backward(const std::vector<double>& grad_out) override;
+    void update(double lr) override;
 
 private:
     std::vector<double> X_, Q_, K_, V_, S_, A_, Y_;
