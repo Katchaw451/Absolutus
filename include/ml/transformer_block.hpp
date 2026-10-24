@@ -1,5 +1,5 @@
 #pragma once
-#include "ml/attention.hpp"
+#include "ml/multihead.hpp"
 #include "ml/layernorm.hpp"
 #include "ml/mlp.hpp"
 #include <random>
@@ -8,24 +8,22 @@
 namespace absolutus {
 namespace ml {
 
-// Pre-norm transformer block, the unit that stacks.
-//   h = x + Attention(LayerNorm(x))
-//   y = h + FFN(LayerNorm(h))       where FFN(v) = W2 relu(W1 v)
-// Requires d_k == d_model for the residual stream.
-// use_residual=false gives the "no residual" ablation for tests only.
 class TransformerBlock {
 public:
-    size_t seq_len, d_model, d_ff;
+    size_t seq_len, d_model, d_ff, n_heads;
     bool use_residual;
     double momentum;
 
     LayerNorm ln1, ln2;
-    Attention attn;
+    MultiHeadAttention attn;
     Dense ffn1, ffn2;
 
     TransformerBlock(size_t sl, size_t dm, size_t dff,
                      std::mt19937_64& rng, bool residual = true,
-                     double momentum_ = 0.9);
+                     double momentum_ = 0.9,
+                     size_t n_heads_ = 1,
+                     int quantum_head_idx = -1,
+                     size_t quantum_ql_layers = 1);
 
     const std::vector<double>& forward(const std::vector<double>& x);
     std::vector<double> backward(const std::vector<double>& grad_out);

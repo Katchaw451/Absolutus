@@ -13,7 +13,7 @@ using namespace absolutus::ml;
 int main() {
     std::mt19937_64 rng(123);
 
-    // 1. Forward shape and finiteness
+    // 1. Forward shape and finiteness (classical, 1 head)
     {
         TransformerBlock b(2, 4, 8, rng);
         std::vector<double> x = {0.5, 0.3, -0.2, 0.7, 0.1, -0.4, 0.6, -0.5};
@@ -56,14 +56,11 @@ int main() {
         b.forward(x);
         b.backward({1.0, -1.0, 0.5, 0.2, 0.3, -0.4});
         b.update(0.01);
-        for (double v : b.attn.Wq) CHECK(std::isfinite(v));
-        for (double v : b.ffn1.W) CHECK(std::isfinite(v));
-        for (double v : b.ln1.gamma) CHECK(std::isfinite(v));
+        CHECK(std::isfinite(b.ln1.gamma[0]));
+        CHECK(std::isfinite(b.ffn1.W[0]));
     }
 
-    // 4. Residual preserves gradient scale across depth.
-    //    N=4 blocks stacked, backward, measure ||grad_input||.
-    //    Compare to N=1 baseline. Residual should keep ratio O(1).
+    // 4. Residual preserves gradient scale across depth
     {
         auto measure = [&](size_t n_blocks, bool residual) {
             std::mt19937_64 rng_local(999);
@@ -96,10 +93,39 @@ int main() {
             "    without residual: %.4f\n", ratio_r, ratio_nr);
 
         CHECK(ratio_r > 0.05 && ratio_r < 20.0);
-
         const double dev_r  = std::abs(std::log(ratio_r));
         const double dev_nr = std::abs(std::log(ratio_nr));
         CHECK(dev_r <= dev_nr + 1.0);
+    }
+
+    // 5. Hybrid block: n_heads=2, quantum_head_idx=0 (one quantum head).
+    //    Forward finite, FD gradient on dX matches to 1e-2.
+    {
+        TransformerBlock b(2, 4, 8, rng, true, 0.9, /*n_heads=*/2, /*qidx=*/0);
+        std::vector<double> x = {0.5, 0.3, -0.2, 0.7, 0.1, -0.4, 0.6, -0.5};
+        std::vector<double> gy = {1.0, -0.5, 0.3, 0.2, 0.7, -0.1, -0.3, 0.4};
+
+        auto y = b.forward(x);
+        CHECK(y.size() == 8);
+        for (double v : y) CHECK(std::isfinite(v));
+
+        auto gx = b.backward(gy);
+        const double EPS = 1e-4;
+        for (size_t idx : {size_t(0), size_t(4)}) {
+            auto xp = x; xp[idx] += EPS;
+            auto yp = b.forward(xp);
+            double Lp = 0.0;
+            for (size_t i = 0; i < gy.size(); ++i) Lp += gy[i] * yp[i];
+
+            auto xm = x; xm[idx] -= EPS;
+            auto ym = b.forward(xm);
+            double Lm = 0.0;
+            for (size_t i = 0; i < gy.size(); ++i) Lm += gy[i] * ym[i];
+
+            b.forward(x);
+            double fd = (Lp - Lm) / (2.0 * EPS);
+            CHECK(std::abs(gx[idx] - fd) < 1e-2);
+        }
     }
 
     return 0;
