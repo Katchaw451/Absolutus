@@ -21,7 +21,8 @@ public:
     std::vector<double> vWq, vWk, vWv;
 
     Attention(size_t seq_len_, size_t d_model_, size_t d_k_,
-              std::mt19937_64& rng, double momentum_ = 0.9);
+              std::mt19937_64& rng, double momentum_ = 0.9,
+              bool causal = false);
 
     // X: [seq_len, d_model]. Returns [seq_len, d_k].
     const std::vector<double>& forward(const std::vector<double>& X) override;
@@ -32,7 +33,8 @@ public:
     void update(double lr) override;
 
 private:
-    std::vector<double> X_, Q_, K_, V_, S_, A_, Y_;   // cached
+    std::vector<double> X_, Q_, K_, V_, S_, A_, Y_;
+    bool causal_ = false;   // cached
 };
 
 }}

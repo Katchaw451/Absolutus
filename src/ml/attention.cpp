@@ -24,8 +24,8 @@ static void matTvec(const std::vector<double>& W, size_t n_out, size_t n_in,
 }
 
 Attention::Attention(size_t sl, size_t dm, size_t dk,
-                     std::mt19937_64& rng, double mom)
-    : seq_len(sl), d_model(dm), d_k(dk), momentum(mom),
+                     std::mt19937_64& rng, double mom, bool causal)
+    : seq_len(sl), d_model(dm), d_k(dk), momentum(mom), causal_(causal),
       Wq(dm * dk), Wk(dm * dk), Wv(dm * dk),
       dWq(dm * dk, 0.0), dWk(dm * dk, 0.0), dWv(dm * dk, 0.0),
       vWq(dm * dk, 0.0), vWk(dm * dk, 0.0), vWv(dm * dk, 0.0),
@@ -65,6 +65,7 @@ const std::vector<double>& Attention::forward(const std::vector<double>& X) {
             for (size_t kk = 0; kk < d_k; ++kk)
                 s += Q_[i * d_k + kk] * K_[j * d_k + kk];
             S_[i * seq_len + j] = s * inv_sqrt_dk;
+            if (causal_ && j > i) S_[i * seq_len + j] = -1e30;
         }
         // softmax row i
         double m = *std::max_element(S_.begin() + i * seq_len,

@@ -99,5 +99,38 @@ int main() {
         for (double w : A.Wv) CHECK(std::isfinite(w));
     }
 
+    // Test 5: causal mask — FD gradient still matches
+    {
+        std::mt19937_64 rng2(42);
+        Attention A(3, 4, 4, rng2, 0.9, /*causal=*/true);
+        std::vector<double> X = {
+            0.1, 0.2, 0.3, 0.4,
+            0.5, -0.2, 0.3, -0.1,
+            -0.3, 0.6, -0.4, 0.2
+        };
+        auto Y = A.forward(X);
+        for (double v : Y) CHECK(std::isfinite(v));
+
+        std::vector<double> gy = {1.0, -0.5, 0.3, 0.2, 0.4, -0.3, 0.1, 0.2, -0.1, 0.5, -0.2, 0.3};
+        A.forward(X);
+        auto gX = A.backward(gy);
+        const double EPS = 1e-5;
+        for (size_t idx : {size_t(0), size_t(4), size_t(8)}) {
+            auto Xp = X; Xp[idx] += EPS;
+            auto Yp = A.forward(Xp);
+            double Lp = 0.0;
+            for (size_t i = 0; i < gy.size(); ++i) Lp += gy[i] * Yp[i];
+
+            auto Xm = X; Xm[idx] -= EPS;
+            auto Ym = A.forward(Xm);
+            double Lm = 0.0;
+            for (size_t i = 0; i < gy.size(); ++i) Lm += gy[i] * Ym[i];
+
+            A.forward(X);
+            double fd = (Lp - Lm) / (2.0 * EPS);
+            CHECK(std::abs(gX[idx] - fd) < 1e-3);
+        }
+    }
+
     return 0;
 }
