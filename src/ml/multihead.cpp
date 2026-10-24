@@ -1,4 +1,6 @@
 #include "ml/multihead.hpp"
+#include "ml/attention.hpp"
+#include "hybrid/qattn.hpp"
 #include <algorithm>
 #include <stdexcept>
 
@@ -6,16 +8,26 @@ namespace absolutus {
 namespace ml {
 
 MultiHeadAttention::MultiHeadAttention(size_t sl, size_t dm, size_t nh,
-                                       std::mt19937_64& rng, double mom)
+                                       std::mt19937_64& rng, double mom,
+                                       int qidx, size_t q_layers)
     : seq_len(sl), d_model(dm), n_heads(nh), momentum(mom),
       Wo(dm * dm, 0.0), dWo(dm * dm, 0.0), vWo(dm * dm, 0.0),
       X_(sl * dm, 0.0), concat_(sl * dm, 0.0), Y_(sl * dm, 0.0) {
     if (nh == 0 || dm % nh != 0)
         throw std::invalid_argument("MultiHeadAttention: d_model % n_heads != 0");
+    if (qidx >= int(nh))
+        throw std::invalid_argument("MultiHeadAttention: quantum_head_idx out of range");
     d_k = dm / nh;
     heads.reserve(nh);
-    for (size_t h = 0; h < nh; ++h)
-        heads.emplace_back(sl, dm, d_k, rng, mom);
+    for (size_t h = 0; h < nh; ++h) {
+        if (int(h) == qidx) {
+            heads.push_back(std::make_unique<hybrid::QuantumAttention>(
+                sl, dm, d_k, q_layers, rng, mom));
+        } else {
+            heads.push_back(std::make_unique<Attention>(
+                sl, dm, d_k, rng, mom));
+        }
+    }
     for (size_t i = 0; i < dm; ++i) Wo[i * dm + i] = 1.0;
 }
 
@@ -25,7 +37,7 @@ const std::vector<double>& MultiHeadAttention::forward(const std::vector<double>
     X_ = X;
 
     for (size_t h = 0; h < n_heads; ++h) {
-        const auto& yh = heads[h].forward(X_);
+        const auto& yh = heads[h]->forward(X_);
         for (size_t t = 0; t < seq_len; ++t)
             for (size_t kk = 0; kk < d_k; ++kk)
                 concat_[t * d_model + h * d_k + kk] = yh[t * d_k + kk];
@@ -62,14 +74,14 @@ std::vector<double> MultiHeadAttention::backward(const std::vector<double>& grad
         for (size_t t = 0; t < seq_len; ++t)
             for (size_t kk = 0; kk < d_k; ++kk)
                 g_h[t * d_k + kk] = d_concat[t * d_model + h * d_k + kk];
-        auto gx_h = heads[h].backward(g_h);
+        auto gx_h = heads[h]->backward(g_h);
         for (size_t i = 0; i < seq_len * d_model; ++i) grad_X[i] += gx_h[i];
     }
     return grad_X;
 }
 
 void MultiHeadAttention::update(double lr) {
-    for (auto& h : heads) h.update(lr);
+    for (auto& h : heads) h->update(lr);
     for (size_t i = 0; i < Wo.size(); ++i) {
         vWo[i] = momentum * vWo[i] + dWo[i];
         Wo[i] -= lr * vWo[i];
