@@ -12,11 +12,11 @@ static bool all_finite(const std::vector<double>& v) {
     return true;
 }
 
-static void diagnose(const char* stage, const std::vector<double>& v) {
+static void report_nan(const char* stage, const std::vector<double>& v) {
     for (size_t i = 0; i < v.size(); ++i)
         if (!std::isfinite(v[i])) {
-            std::fprintf(stderr, "DBG: NaN in %s at index %zu = %g\n", stage, i, v[i]);
-            break;
+            std::fprintf(stderr, "DBG: NaN in %s idx=%zu val=%g\n", stage, i, v[i]);
+            return;
         }
 }
 
@@ -45,27 +45,25 @@ const std::vector<double>& MiniLM::forward(const std::vector<size_t>& tokens) {
         for (size_t i = 0; i < d_model; ++i)
             h0_[t*d_model + i] = embed[tokens[t]*d_model + i] + pe.table[t*d_model + i];
 
-    if (!all_finite(h0_)) {
-        diagnose("h0_", h0_);
-        throw std::runtime_error("MiniLM::forward: NaN in h0_");
-    }
+    if (!all_finite(h0_)) { report_nan("h0_", h0_);
+        throw std::runtime_error("MiniLM: NaN in h0_"); }
 
     cur_ = h0_;
     for (size_t b = 0; b < blocks.size(); ++b) {
         cur_ = blocks[b].forward(cur_);
         if (!all_finite(cur_)) {
-            diagnose("cur_ after block " + std::to_string(b), cur_);
-            throw std::runtime_error("MiniLM::forward: NaN after block " + std::to_string(b));
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "after block %zu", b);
+            report_nan(buf, cur_);
+            throw std::runtime_error("MiniLM: NaN in block");
         }
     }
 
     for (size_t t = 0; t < seq_len; ++t) {
         std::vector<double> v(cur_.begin() + t*d_model, cur_.begin() + (t+1)*d_model);
         auto lg = head.forward(v);
-        if (!all_finite(lg)) {
-            diagnose("head out at token " + std::to_string(t), lg);
-            throw std::runtime_error("MiniLM::forward: NaN in head output");
-        }
+        if (!all_finite(lg)) { report_nan("head_out", lg);
+            throw std::runtime_error("MiniLM: NaN in head"); }
         std::copy(lg.begin(), lg.end(), logits_.begin() + t*vocab_size);
     }
     return logits_;
@@ -107,6 +105,35 @@ void MiniLM::update(double lr) {
     for (size_t i = 0; i < embed.size(); ++i) embed[i] -= lr * dembed[i];
     for (auto& b : blocks) b.update(lr);
     head.update(lr);
+}
+
+void MiniLM::clip_gradients(double max_norm) {
+    double n2 = 0.0;
+    auto acc = [&](const std::vector<double>& g) {
+        for (double v : g) n2 += v * v;
+    };
+    acc(dembed);
+    acc(head.dW); acc(head.db);
+    for (auto& b : blocks) {
+        acc(b.ln1.dgamma); acc(b.ln1.dbeta);
+        acc(b.ln2.dgamma); acc(b.ln2.dbeta);
+        acc(b.attn.dWq); acc(b.attn.dWk); acc(b.attn.dWv);
+        acc(b.ffn1.dW);  acc(b.ffn1.db);
+        acc(b.ffn2.dW);  acc(b.ffn2.db);
+    }
+    const double norm = std::sqrt(n2);
+    if (norm <= max_norm || norm == 0.0) return;
+    const double scale = max_norm / norm;
+    auto sc = [&](std::vector<double>& g) { for (auto& v : g) v *= scale; };
+    sc(dembed);
+    sc(head.dW); sc(head.db);
+    for (auto& b : blocks) {
+        sc(b.ln1.dgamma); sc(b.ln1.dbeta);
+        sc(b.ln2.dgamma); sc(b.ln2.dbeta);
+        sc(b.attn.dWq); sc(b.attn.dWk); sc(b.attn.dWv);
+        sc(b.ffn1.dW);  sc(b.ffn1.db);
+        sc(b.ffn2.dW);  sc(b.ffn2.db);
+    }
 }
 
 }}
