@@ -15,6 +15,10 @@ namespace ml {
 int run_train_xor(int epochs, double lr, double momentum, uint64_t seed);
 int run_train_lm(int epochs, double lr, uint64_t seed,
                  size_t n_heads, int qhead);
+int run_train_text(int epochs, double lr, uint64_t seed,
+                   const std::string& corpus_path, size_t n_merges,
+                   size_t d_model, size_t d_ff, size_t n_blocks,
+                   size_t seq_len, size_t n_sample);
 }
 namespace hybrid {
 int run_train_qxor(int epochs, double lr, double momentum,
@@ -77,6 +81,7 @@ int main(int argc, char** argv) {
         if (experiment == "vqe")          return absolutus::physics::run_vqe(vqe_iters, lr, seed);
         if (experiment == "train_xor")    return absolutus::ml::run_train_xor(train_epochs, lr, momentum, seed);
         if (experiment == "train_lm")     return absolutus::ml::run_train_lm(train_epochs, lr, seed, lm_heads, lm_qhead);
+        if (experiment == "train_text")   return absolutus::ml::run_train_text(200, lr, seed, "data/shakespeare.txt", 128, 16, 32, 2, 8, 30);
         if (experiment == "train_qxor")   return absolutus::hybrid::run_train_qxor(train_epochs, lr, momentum, qxor_params, seed);
         if (experiment == "train_hybrid") {
             hy_q = n_qubits;
