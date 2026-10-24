@@ -13,7 +13,7 @@ Aspire Go 15 (i3-N305, 8 GB RAM) in ~3 seconds:
     Baseline (2 classical heads):      0.354 s,  loss = 0.000000
     Hybrid   (1 quantum + 1 classical): 2.736 s,  loss = 0.000000
 
-The 7.7x slowdown is the parameter-shift rule's inherent cost: each
+The 5.3x slowdown (10-seed mean) is the parameter-shift rule's inherent cost: each
 quantum parameter needs 2 forward circuit evaluations per backward pass,
 versus 1 analytic gradient for a classical head.
 
