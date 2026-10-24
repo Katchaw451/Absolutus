@@ -14,11 +14,11 @@ static bool finite_ok(const std::vector<double>& v) {
 TransformerBlock::TransformerBlock(size_t sl, size_t dm, size_t dff,
                                    std::mt19937_64& rng, bool residual,
                                    double mom, size_t nh,
-                                   int qidx, size_t q_layers)
+                                   int qidx, size_t q_layers, bool causal)
     : seq_len(sl), d_model(dm), d_ff(dff), n_heads(nh),
       use_residual(residual), momentum(mom),
       ln1(dm, mom), ln2(dm, mom),
-      attn(sl, dm, nh, rng, mom, qidx, q_layers),
+      attn(sl, dm, nh, rng, mom, qidx, q_layers, causal),
       ffn1(dm, dff, Activation::ReLU, rng, mom),
       ffn2(dff, dm, Activation::Linear, rng, mom),
       x_(sl*dm, 0.0), ln1_out_(sl*dm, 0.0), attn_out_(sl*dm, 0.0),

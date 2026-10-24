@@ -24,3 +24,4 @@ configs/local_*.json
 !results/.gitkeep
 !logs/.gitkeep
 !build/.gitkeep
+data/

@@ -23,7 +23,8 @@ public:
                      double momentum_ = 0.9,
                      size_t n_heads_ = 1,
                      int quantum_head_idx = -1,
-                     size_t quantum_ql_layers = 1);
+                     size_t quantum_ql_layers = 1,
+                     bool causal = false);
 
     const std::vector<double>& forward(const std::vector<double>& x);
     std::vector<double> backward(const std::vector<double>& grad_out);

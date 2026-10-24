@@ -9,7 +9,7 @@ namespace ml {
 
 MultiHeadAttention::MultiHeadAttention(size_t sl, size_t dm, size_t nh,
                                        std::mt19937_64& rng, double mom,
-                                       int qidx, size_t q_layers)
+                                       int qidx, size_t q_layers, bool causal)
     : seq_len(sl), d_model(dm), n_heads(nh), momentum(mom),
       Wo(dm * dm, 0.0), dWo(dm * dm, 0.0), vWo(dm * dm, 0.0),
       X_(sl * dm, 0.0), concat_(sl * dm, 0.0), Y_(sl * dm, 0.0) {
@@ -25,7 +25,7 @@ MultiHeadAttention::MultiHeadAttention(size_t sl, size_t dm, size_t nh,
                 sl, dm, d_k, q_layers, rng, mom));
         } else {
             heads.push_back(std::make_unique<Attention>(
-                sl, dm, d_k, rng, mom));
+                sl, dm, d_k, rng, mom, causal));
         }
     }
     for (size_t i = 0; i < dm; ++i) Wo[i * dm + i] = 1.0;

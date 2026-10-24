@@ -21,7 +21,8 @@ public:
     MultiHeadAttention(size_t sl, size_t dm, size_t nh, std::mt19937_64& rng,
                        double momentum_ = 0.9,
                        int quantum_head_idx = -1,
-                       size_t quantum_ql_layers = 1);
+                       size_t quantum_ql_layers = 1,
+                       bool causal = false);
 
     const std::vector<double>& forward(const std::vector<double>& X);
     std::vector<double> backward(const std::vector<double>& grad_out);
