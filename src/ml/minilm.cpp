@@ -15,7 +15,7 @@ static bool all_finite(const std::vector<double>& v) {
 
 MiniLM::MiniLM(size_t sl, size_t dm, size_t dff, size_t vs,
                size_t nblocks, std::mt19937_64& rng, double mom,
-               size_t nh, int qidx, size_t q_layers)
+               size_t nh, int qidx, size_t q_layers, bool causal)
     : seq_len(sl), d_model(dm), d_ff(dff), vocab_size(vs), n_blocks(nblocks),
       n_heads(nh), quantum_head_idx(qidx), momentum(mom),
       embed(vs * dm), dembed(vs * dm, 0.0),
@@ -27,7 +27,7 @@ MiniLM::MiniLM(size_t sl, size_t dm, size_t dff, size_t vs,
     for (auto& e : embed) e = dist(rng);
     blocks.reserve(nblocks);
     for (size_t b = 0; b < nblocks; ++b)
-        blocks.emplace_back(sl, dm, dff, rng, true, mom, nh, qidx, q_layers);
+        blocks.emplace_back(sl, dm, dff, rng, true, mom, nh, qidx, q_layers, causal);
 }
 
 const std::vector<double>& MiniLM::forward(const std::vector<size_t>& tokens) {
