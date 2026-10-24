@@ -29,7 +29,8 @@ static void usage(const char* prog) {
         "usage: %s --experiment <name> [options]\n"
         "  names:\n"
         "    chsh, ghz, vqe, train_xor, train_lm, train_qxor, train_hybrid\n"
-        "  train_lm options: [--epochs N] [--lr L] [--seed S] [--n-heads N] [--qhead H]\n",
+        "  train_lm options:\n"
+        "    [--epochs N] [--lr L] [--seed S] [--n-heads N] [--qhead H]\n",
         prog);
 }
 
