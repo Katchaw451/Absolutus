@@ -1,4 +1,6 @@
 #include "ml/minilm.hpp"
+#include "ml/attention.hpp"
+#include "hybrid/qattn.hpp"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
