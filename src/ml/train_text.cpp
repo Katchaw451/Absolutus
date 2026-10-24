@@ -86,8 +86,10 @@ int run_train_text(int epochs, double lr, uint64_t seed,
         double total = 0.0;
         size_t n_batches = 0;
         const size_t windows_per_epoch = std::min<size_t>(n_windows, 500);
+        const size_t epoch_start = ((size_t)epoch * windows_per_epoch) % n_windows;
+        const size_t epoch_start = ((size_t)epoch * windows_per_epoch) % n_windows;
         for (size_t w = 0; w < windows_per_epoch; ++w) {
-            const size_t off = w * seq_len;
+            const size_t off = ((epoch_start + w) % n_windows) * seq_len;
             std::vector<size_t> tokens(seq_len);
             std::vector<size_t> targets(seq_len);
             for (size_t t = 0; t < seq_len; ++t) {
