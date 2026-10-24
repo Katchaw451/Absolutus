@@ -187,3 +187,16 @@ Precomputed once, added to embeddings. Non-learnable because:
    permutation-invariant (Attention(P·X) == P·Attention(X)); with PE,
    this equality breaks. This is the empirical signature that position
    information is actually entering the model.
+
+## Repo hygiene: verify a fresh clone before publishing
+
+A build that works in the working tree but fails in a fresh clone is a
+repo nobody can use. The invariant that matters:
+
+    git clone <url> /tmp/verify
+    cd /tmp/verify && cmake -B build && cmake --build build && ctest
+
+This must pass after every push that touches source. The docs commit
+29e4de3 shipped without this check and was followed by a chore commit
+that finally tracked 20 missing source files. The check would have
+caught that in 30 seconds.
