@@ -152,14 +152,19 @@ int run_train_text(int epochs, double lr, uint64_t seed,
             }
             auto logits = lm.forward(win);
             size_t last_pos = ids.size() > seq_len ? seq_len - 1 : ids.size() - 1;
-            size_t best = 0;
-            double best_val = logits[last_pos * vocab_size];
-            for (size_t v = 1; v < vocab_size; ++v) {
-                if (logits[last_pos * vocab_size + v] > best_val) {
-                    best_val = logits[last_pos * vocab_size + v];
-                    best = v;
-                }
+            const double T = 0.7;
+            double mx = logits[last_pos * vocab_size];
+            for (size_t v = 1; v < vocab_size; ++v)
+                if (logits[last_pos * vocab_size + v] > mx) mx = logits[last_pos * vocab_size + v];
+            std::vector<double> probs(vocab_size);
+            double zsum = 0.0;
+            for (size_t v = 0; v < vocab_size; ++v) {
+                probs[v] = std::exp((logits[last_pos * vocab_size + v] - mx) / T);
+                zsum += probs[v];
             }
+            for (auto& p : probs) p /= zsum;
+            std::discrete_distribution<size_t> dist(probs.begin(), probs.end());
+            size_t best = dist(rng);
             ids.push_back(best);
             gen.push_back(best);
         }
