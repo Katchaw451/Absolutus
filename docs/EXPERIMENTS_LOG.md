@@ -4,116 +4,163 @@ Quantitative record of training experiments. Each entry states the
 hypothesis being tested, the configuration, the measured outcome, and
 the conclusion drawn.
 
+**Methodological note.** Every conclusion below is based on 100-token
+samples, not 30-token. The 30-token samples that informed an earlier
+version of this document were noisy: individual draws over/under-
+represented specific token attractors. The 100-token samples give a
+representative view of the model's distribution (albeit still one
+draw — multi-seed ablation is listed as future work).
+
+**Sampling note.** All outputs below use top-k=40 + repetition
+penalty=1.3 (window 20) + temperature=0.7. Without these, all three
+configs collapse into repetition (see Sampling Ablation section).
+
 ---
 
 ## Baseline (reference)
 
-- **Config**: 200 epochs, d_model=16, d_ff=32, 2 blocks, 128 merges
-- **Loss**: 7.44 (ep 1) -> 3.88 (ep 200), plateau ~3.7-4.0 after ep 100
-- **Output**: `'t HMONONDONDithere you to a dainsedainjake of HM'`
-- **Reading**: end-to-end functional, but capacity-limited (fragments
-  dominate, no full words except short ones like `you`, `to`, `a`)
+- **Config**: 200 epochs, d_model=16, d_ff=32, 2 blocks, 128 merges,
+  ~4k params
+- **Loss**: 7.44 (ep 1) -> 3.88 (ep 200)
+- **Output (100 tok)**: `, ADERICHis uput I have a p Goven thy of wrood
+  HMONDERICHMOLAThat was RBated a boouslack up MOND HARDInhim our
+  stower hould a shast the dake of LONDertomarkne`
+- **Reading**: strongest local phrase quality of the three.
+  `I have a` (full English trigram), `thy of`, `the dake of LOND...`
+  (the "Duke of [city]" pattern, very Shakespearean). But no
+  higher-order structure — no dialogue format, no consistent
+  capitalization pattern. Fragments dominate between phrases.
 
 ## Experiment A: more data (1000 epochs, same capacity)
 
 - **Hypothesis**: 200 epochs see the corpus 1.28 times. More epochs
-  should let the model consolidate word boundaries.
+  should consolidate word boundaries.
 - **Config**: 1000 epochs, d_model=16, d_ff=32, 2 blocks, ~4k params
-- **Loss**: 7.44 (ep 1) -> **3.754 (ep 1000)**, delta = -0.13 vs baseline
-- **Output**: `'. GREGREGREGRESON: AMPSAMPSAuued'`
-
-**Reading**: Loss improves by 3.3% but output quality degrades.
-`GREGREGREG` (GREGORY, a Shakespeare character) and `AMPSAMPS` exhibit
-the same repetition-collapse failure as the pre-temperature-sampling
-run, just on different attractors than the baseline's `daindain`.
-More epochs makes the model MORE confident in whatever pattern it has
-locked onto, not more accurate. The corpus was seen 6.4 times by
-epoch 1000; this is overfitting to conditional-structure biases that
-the 4k-param model cannot resolve into word-level features.
+- **Loss**: 7.44 (ep 1) -> **3.754 (ep 1000)** — delta -0.13 vs baseline
+- **Output (100 tok)**: `. GRESON: MPSAMon, thuely them ir mbrokn the
+  pot. SAMPREGON: and aince with theet I pir, Thuin. SAMPSOREGRY: I
+  will sh the pent them uin, they guloir. SON: A`
+- **Reading**: strongest structural learning of the three. The
+  `NAME: dialogue` pattern appears 4 times. `GRESON`, `SAMPREGON`,
+  `SAMPSOREGRY`, `SON` are corrupted variants of `GREGORY`,
+  `SAMPSON`, `SAMPSON`, `SON` — actual character labels in Romeo
+  and Juliet. The model learned the play format: capitalized word,
+  colon, lowercase text. Also has coherent phrases (`I will`,
+  `and with`). Word-level quality is worse than baseline
+  (`GRESON` vs `Goven`), but higher-order structure is far better.
 
 ## Experiment B: more capacity (d_model=32, 1 block, 200 epochs)
 
 - **Hypothesis**: The plateau is capacity-limited. A wider, shallower
   model has more representational room even with similar parameter
-  count, so it should learn word boundaries.
+  count.
 - **Config**: 200 epochs, d_model=32, d_ff=32 (unchanged), 1 block,
-  ~4k params (same as baseline)
-- **Loss**: 5.44 (ep 1, lower than 7.44 because wider init is closer to
-  uniform) -> **3.849 (ep 200)**, delta = -0.03 vs baseline
-- **Output**: `'UD RICHARDULANograckaleacaining comelead'`
+  ~4k params
+- **Loss**: 5.44 (ep 1, lower because wider init is closer to uniform)
+  -> **3.849 (ep 200)** — delta -0.03 vs baseline
+- **Output (100 tok)**: `aving steacir hongainesturdy HMONDUWhat AThe
+  prothochich alefhastare wear RICHMONDADey my talardeashath longost
+  of HARDONERICHMy thould what and Loo how wain`
+- **Reading**: intermediate. Has `RICHMOND` spelled correctly (a
+  Henry VI character that neither A nor baseline spells correctly),
+  has `The X Y wear` (syntactic), has `My ... what and ... how ...`
+  (attempt at structure). But fragments dominate, no dialogue
+  format, no consistent capitalization pattern like A. Word-level
+  quality between baseline and A.
 
-**Reading**: Loss is essentially identical to the baseline (3.85 vs
-3.88) but output is qualitatively much better:
-- `RICHARD` — a full Shakespeare character name (5 chars, 2-3 BPE pieces)
-- `come`, `lead` — real English words
-- No immediate repetition collapse
+## The key finding: loss does not rank output quality
 
-The model has consolidated longer tokens into coherent units, which
-d=16 cannot represent. This happens without lowering the aggregate
-per-token cross-entropy — the loss plateau is not the right metric
-for output quality at this scale.
+| Config | Epochs | Loss | Primary strength |
+| :--- | :--- | :--- | :--- |
+| Baseline | 200 | 3.88 | local phrases (`I have a`, `the dake of`) |
+| A: 1000 ep | 1000 | **3.75** | **higher-order structure** (dialogue format) |
+| B: d=32 | 200 | 3.85 | some full-word spellings (`RICHMOND`) |
 
-## The key finding: loss and output quality diverge
+A has the lowest loss and the most structural learning. Baseline
+has the highest loss and the best phrase-level quality. B is between
+on all axes. **None of these correlations is causal**: the loss
+metric compresses all of these effects into a single average.
 
-| Config | Params | Epochs | Loss | Output |
-| :--- | :--- | :--- | :--- | :--- |
-| Baseline | ~4k | 200 | 3.88 | fragments + short words |
-| A: 1000 ep | ~4k | 1000 | **3.75** | fragments + repetition collapse |
-| B: d=32 | ~4k | 200 | 3.85 | **real names + words** |
+The 30-token sample earlier suggested B was best. With 100 tokens,
+that conclusion collapses. A single short sample is not a measure
+of model quality.
 
-A has the lowest loss but the worst output. B has loss essentially
-equal to the baseline but the best output. **The aggregate
-cross-entropy on 196 tokens does not distinguish between "learns
-correct word boundaries" and "learns fragment-collocation with high
-confidence."** Both reduce the metric; only the first produces
-coherent text.
+---
 
-Practical implication: at this scale, tuning for loss is
-counterproductive. The right signal is a qualitative assessment of
-the generated output. This is a small-model regime where perplexity
-and usefulness have decoupled — which is known in the literature
-(Brown et al. 2020 on GPT-3 showed this starts happening below
-certain scale thresholds) but seeing it directly is instructive.
+## Sampling Ablation
 
-## What neither experiment escapes
+Same models, different sampling strategies, evaluating the frequency
+of repetition collapse.
 
-- **Loss plateau**: 3.75-3.88 regardless of configuration. The model
-  has converged on the conditional distribution it can represent.
-- **Token-level quality**: neither produces grammatical text. A
-  sonnet is not happening at d=32.
-- **The corpus size**: 1.1 MB is small. Both experiments exhaust the
-  learnable structure, just in different ways.
+### Greedy (argmax, first attempt)
 
-## What this suggests for next steps
+output: 'daindaindaindaindaindaindaindaindaindain'
 
-The direction that actually addresses the finding:
+Total collapse. Once the model predicts `dain`, argmax re-predicts it
+forever. This is not a model bug — argmax is a deterministic map from
+context to next token, and small models have absorbing states.
 
-1. **Not more epochs**. A shows this is counterproductive at fixed
-   capacity.
-2. **Not just more d_model**. B is better but the effect is per-token
-   representation, not deeper architecture.
-3. **Better training signal**: at this scale, what would actually
-   help is more data diversity (second corpus), not more of the same.
-   The model has extracted everything it can from Shakespeare at this
-   capacity.
+### Temperature sampling (T=0.7, no top-k)
 
-Concrete next experiment (not run): same d_model=32, but with
-sequence-level loss instead of per-token CE, or with a small amount
-of labeled contrast between "real word boundary" and "wrong boundary".
-This is out of scope for today.
+output: 't HMONONDONDithere you to a dainsedainjake of HM'
 
-## Reproduction
+Collapse broken — variety present. Real words: `there`, `you`,
+`to`, `a`, `of`. But fragment repetition (`HMONON`) and BPE
+gluing (`dainsedainjake`) remain.
+
+### Top-k=40 + repetition penalty=1.3 (window 20)
+
+output: ', ADERICHis uput I have a p Goven thy of wrood HMONDERICHMOLAThat...'
+
+Fragments reduced. Real phrases (`I have a`), real structural
+patterns (`the dake of`). Repetition gone.
+
+### The lesson
+
+The apparent "quality" of a small model is a **joint** property of
+the model weights and the sampling strategy. The 1.76 -> 7.03 loss
+fix (causal mask) was necessary but not sufficient for readable
+output. Top-k was also necessary. Many deployment failures attributed
+to "small model is bad" are actually "small model plus greedy decoding
+is bad".
+
+---
+
+## Conclusion
+
+1. **The plateau is real but not monotonic across metrics.** A
+   improves loss by 3.3% and structural output; baseline keeps better
+   phrase-level output at higher loss. No single loss number
+   summarizes model quality at this scale.
+
+2. **Top-k sampling is essential**, not optional. All three configs
+   collapse under greedy decoding. The same models under top-k produce
+   output that reveals their different strengths.
+
+3. **Single short samples are noisy.** The 30-token sample that
+   suggested "B is best" was overturned by a 100-token sample. Future
+   experiments should use at least 100 tokens and ideally multiple
+   seeds.
+
+## Reproduce
 
     cd ~/Absolutus
     curl -sL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o data/shakespeare.txt
     cmake -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build -j$(nproc)
 
-    # Baseline
-    ./build/absolutus --experiment train_text
+    # Baseline with top-k
+    ./build/absolutus --experiment train_text --samples 100
 
     # Experiment A
-    ./build/absolutus --experiment train_text --lm-epochs 1000
+    ./build/absolutus --experiment train_text --lm-epochs 1000 --samples 100
 
     # Experiment B
-    ./build/absolutus --experiment train_text --lm-epochs 200 --d-model 32 --blocks 1
+    ./build/absolutus --experiment train_text --lm-epochs 200 --d-model 32 --blocks 1 --samples 100
+
+## Future work
+
+- Multi-seed evaluation (5+ seeds per config, aggregate statistics)
+- Sentence-level BLEU or held-out perplexity per config
+- Corpus diversity test (second public-domain text)
+- Word-boundary-aware loss (distinguish `GRESON` from `GREGORY`)

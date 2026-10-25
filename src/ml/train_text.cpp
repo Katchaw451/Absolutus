@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <functional>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -152,17 +153,40 @@ int run_train_text(int epochs, double lr, uint64_t seed,
             }
             auto logits = lm.forward(win);
             size_t last_pos = ids.size() > seq_len ? seq_len - 1 : ids.size() - 1;
+
+            std::vector<double> work(vocab_size);
+            for (size_t v = 0; v < vocab_size; ++v)
+                work[v] = logits[last_pos * vocab_size + v];
+
+            const double REP_PENALTY = 1.3;
+            const size_t REP_WINDOW = 20;
+            const size_t rep_start = gen.size() > REP_WINDOW ? gen.size() - REP_WINDOW : 0;
+            for (size_t g = rep_start; g < gen.size(); ++g) {
+                const size_t id = gen[g];
+                if (work[id] > 0) work[id] /= REP_PENALTY;
+                else work[id] *= REP_PENALTY;
+            }
+
+            const size_t TOP_K = 40;
+            const size_t kk = std::min(TOP_K, vocab_size);
+            std::vector<double> sorted = work;
+            std::partial_sort(sorted.begin(), sorted.begin() + kk, sorted.end(),
+                              std::greater<double>());
+            const double threshold = sorted[kk - 1];
+
             const double T = 0.7;
-            double mx = logits[last_pos * vocab_size];
-            for (size_t v = 1; v < vocab_size; ++v)
-                if (logits[last_pos * vocab_size + v] > mx) mx = logits[last_pos * vocab_size + v];
-            std::vector<double> probs(vocab_size);
+            double mx = -1e30;
+            for (size_t v = 0; v < vocab_size; ++v)
+                if (work[v] >= threshold && work[v] > mx) mx = work[v];
+            std::vector<double> probs(vocab_size, 0.0);
             double zsum = 0.0;
             for (size_t v = 0; v < vocab_size; ++v) {
-                probs[v] = std::exp((logits[last_pos * vocab_size + v] - mx) / T);
-                zsum += probs[v];
+                if (work[v] >= threshold) {
+                    probs[v] = std::exp((work[v] - mx) / T);
+                    zsum += probs[v];
+                }
             }
-            for (auto& p : probs) p /= zsum;
+            for (size_t v = 0; v < vocab_size; ++v) probs[v] /= zsum;
             std::discrete_distribution<size_t> dist(probs.begin(), probs.end());
             size_t best = dist(rng);
             ids.push_back(best);
