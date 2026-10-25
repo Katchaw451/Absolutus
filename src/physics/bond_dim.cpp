@@ -67,35 +67,42 @@ static StateVector<double> make_random_circuit(size_t n, size_t depth,
                                                std::mt19937_64& rng) {
     StateVector<double> s(n);
     std::uniform_real_distribution<double> u(0.0, 1.0);
+    const double TAU = 6.283185307179586;
     for (size_t d = 0; d < depth; ++d) {
         for (size_t q = 0; q < n; ++q)
-            core::apply1(s, core::RY<double>(u(rng) * 6.283185307179586), q);
+            core::apply1(s, core::RY<double>(u(rng) * TAU), q);
         for (size_t q = 0; q + 1 < n; ++q)
             core::apply2(s, core::CNOT<double>(), q, q + 1);
     }
     return s;
 }
 
-int run_bond_dim(uint64_t seed) {
-    std::mt19937_64 rng(seed);
-    const size_t n = 10;
-    std::printf("state,n,max_bond,profile\n");
-    auto report = [&](const char* name, const StateVector<double>& s) {
+int run_bond_dim(size_t n, int n_seeds, uint64_t seed) {
+    if (n < 2 || n > 16) {
+        std::fprintf(stderr, "bond_dim: n in [2,16], got %zu\n", n);
+        return 1;
+    }
+    std::printf("state,n,seed,max_bond,profile\n");
+    auto report = [&](const char* name, const StateVector<double>& s, int sd) {
         auto p = bond_profile(s, 1e-10);
         size_t mb = 0;
         for (auto x : p) if (x > mb) mb = x;
-        std::printf("%s,%zu,%zu,\"", name, n, mb);
-        for (size_t k = 0; k <= n; ++k) {
+        std::printf("%s,%zu,%d,%zu,\"", name, n, sd, mb);
+        for (size_t k = 0; k <= n; ++k)
             std::printf("%zu%s", p[k], k < n ? " " : "");
-        }
         std::printf("\"\n");
+        std::fflush(stdout);
     };
-    report("product",   make_product(n));
-    report("ghz",       make_ghz(n));
-    report("w",         make_w(n));
-    report("rand_d1",   make_random_circuit(n, 1,  rng));
-    report("rand_d3",   make_random_circuit(n, 3,  rng));
-    report("rand_d10",  make_random_circuit(n, 10, rng));
+    report("product", make_product(n), -1);
+    report("ghz",     make_ghz(n),     -1);
+    report("w",       make_w(n),       -1);
+
+    for (int s = 0; s < n_seeds; ++s) {
+        std::mt19937_64 rng(seed + (uint64_t)s * 1000003ULL);
+        report("rand_d1",  make_random_circuit(n, 1,  rng), s);
+        report("rand_d3",  make_random_circuit(n, 3,  rng), s);
+        report("rand_d10", make_random_circuit(n, 10, rng), s);
+    }
     return 0;
 }
 

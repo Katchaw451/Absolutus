@@ -13,6 +13,6 @@ template <typename R>
 std::vector<size_t> bond_profile(const core::StateVector<R>& psi,
                                  R threshold = R(1e-10));
 
-int run_bond_dim(uint64_t seed);
+int run_bond_dim(size_t n, int n_seeds, uint64_t seed);
 
 }}
