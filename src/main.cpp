@@ -34,7 +34,11 @@ static void usage(const char* prog) {
         "  names:\n"
         "    chsh, ghz, vqe, train_xor, train_lm, train_qxor, train_hybrid\n"
         "  train_lm options:\n"
-        "    [--epochs N] [--lr L] [--seed S] [--n-heads N] [--qhead H]\n",
+        "    [--epochs N] [--lr L] [--seed S] [--n-heads N] [--qhead H]\n"
+        "  train_text options:\n"
+        "    [--lm-epochs N] [--lr L] [--seed S] [--corpus PATH]\n"
+        "    [--merges N] [--d-model N] [--d-ff N] [--blocks N]\n"
+        "    [--seq-len N] [--samples N]\n",
         prog);
 }
 
@@ -50,6 +54,14 @@ int main(int argc, char** argv) {
     size_t hy_q = 2, hy_params = 4;
     size_t lm_heads = 1;
     int lm_qhead = -1;
+    size_t lm_epochs = 200;
+    size_t lm_merges = 128;
+    size_t lm_dmodel = 16;
+    size_t lm_dff = 32;
+    size_t lm_blocks = 2;
+    size_t lm_seq_len = 8;
+    size_t lm_samples = 30;
+    std::string lm_corpus = "data/shakespeare.txt";
     double lr = 0.1;
     double momentum = 0.9;
 
@@ -67,6 +79,14 @@ int main(int argc, char** argv) {
         }
         else if (!std::strcmp(argv[i], "--n-heads") && i + 1 < argc) lm_heads = (size_t)std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--qhead")   && i + 1 < argc) lm_qhead = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--lm-epochs") && i + 1 < argc) lm_epochs = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--merges")    && i + 1 < argc) lm_merges = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--d-model")   && i + 1 < argc) lm_dmodel = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--d-ff")      && i + 1 < argc) lm_dff = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--blocks")    && i + 1 < argc) lm_blocks = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--seq-len")   && i + 1 < argc) lm_seq_len = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--samples")   && i + 1 < argc) lm_samples = (size_t)std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--corpus")    && i + 1 < argc) lm_corpus = argv[++i];
         else if (!std::strcmp(argv[i], "--lr")       && i + 1 < argc) lr = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--momentum") && i + 1 < argc) momentum = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--help") || !std::strcmp(argv[i], "-h")) { usage(argv[0]); return 0; }
@@ -81,7 +101,9 @@ int main(int argc, char** argv) {
         if (experiment == "vqe")          return absolutus::physics::run_vqe(vqe_iters, lr, seed);
         if (experiment == "train_xor")    return absolutus::ml::run_train_xor(train_epochs, lr, momentum, seed);
         if (experiment == "train_lm")     return absolutus::ml::run_train_lm(train_epochs, lr, seed, lm_heads, lm_qhead);
-        if (experiment == "train_text")   return absolutus::ml::run_train_text(200, lr, seed, "data/shakespeare.txt", 128, 16, 32, 2, 8, 30);
+        if (experiment == "train_text")   return absolutus::ml::run_train_text(
+            (int)lm_epochs, lr, seed, lm_corpus, lm_merges, lm_dmodel, lm_dff,
+            lm_blocks, lm_seq_len, lm_samples);
         if (experiment == "train_qxor")   return absolutus::hybrid::run_train_qxor(train_epochs, lr, momentum, qxor_params, seed);
         if (experiment == "train_hybrid") {
             hy_q = n_qubits;
