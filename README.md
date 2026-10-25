@@ -72,6 +72,7 @@ versus 1 analytic gradient for a classical head.
 ## Documentation
 
 - docs/RESULTS.md  -- measured numbers, all experiments
+- docs/TEXT_TRAINING.md -- BPE + language model trajectory (7.44 -> 3.88)
 - docs/DESIGN.md   -- architectural decisions and rationale
 - docs/NOTEBOOK.md -- chronological lab notebook
 
