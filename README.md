@@ -74,6 +74,7 @@ versus 1 analytic gradient for a classical head.
 - docs/RESULTS.md  -- measured numbers, all experiments
 - docs/TEXT_TRAINING.md -- BPE + language model trajectory (7.44 -> 3.88)
 - docs/EXPERIMENTS_LOG.md -- A/B experiments: 1000 epochs vs d_model=32
+- docs/MPS_BOUNDARY.md -- empirical map of classical simulability (chi profile)
 - docs/DESIGN.md   -- architectural decisions and rationale
 - docs/NOTEBOOK.md -- chronological lab notebook
 
