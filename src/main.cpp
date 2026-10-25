@@ -10,6 +10,7 @@ namespace physics {
 int run_chsh(int n_trials, uint64_t seed);
 int run_ghz(size_t n_qubits, int n_seeds);
 int run_vqe(int max_iter, double lr, uint64_t seed);
+int run_bond_dim(uint64_t seed);
 }
 namespace ml {
 int run_train_xor(int epochs, double lr, double momentum, uint64_t seed);
@@ -97,6 +98,7 @@ int main(int argc, char** argv) {
 
     try {
         if (experiment == "chsh")         return absolutus::physics::run_chsh(n_trials, seed);
+        if (experiment == "bond_dim")     return absolutus::physics::run_bond_dim(seed);
         if (experiment == "ghz")          return absolutus::physics::run_ghz(n_qubits, n_seeds);
         if (experiment == "vqe")          return absolutus::physics::run_vqe(vqe_iters, lr, seed);
         if (experiment == "train_xor")    return absolutus::ml::run_train_xor(train_epochs, lr, momentum, seed);
