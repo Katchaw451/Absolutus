@@ -19,8 +19,11 @@ std::vector<size_t> bond_profile(const StateVector<R>& psi, R threshold) {
     const size_t n = psi.n_qubits();
     std::vector<size_t> profile(n + 1, 1);
     for (size_t k = 1; k < n; ++k) {
-        std::vector<size_t> keep(k);
-        for (size_t i = 0; i < k; ++i) keep[i] = i;
+        // Schmidt rank is symmetric: rank(cut k) = rank(cut n-k).
+        // Use the smaller side so rho_A is at most 2^(n/2) x 2^(n/2).
+        const size_t side = std::min(k, n - k);
+        std::vector<size_t> keep(side);
+        for (size_t i = 0; i < side; ++i) keep[i] = i;
         auto rho = core::partial_trace(psi, keep);
         const size_t d = rho.rows;
         std::vector<Complex<double>> H(d * d);
