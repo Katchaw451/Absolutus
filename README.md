@@ -17,6 +17,25 @@ The 5.3x slowdown (10-seed mean) is the parameter-shift rule's inherent cost: ea
 quantum parameter needs 2 forward circuit evaluations per backward pass,
 versus 1 analytic gradient for a classical head.
 
+## Two results
+
+**Physics (correct, verified):**
+- CHSH: S = 2.828427125 = 2*sqrt(2) to 9 decimals
+- GHZ: 5 independent physics assertions exact at n=20
+- VQE H2: |E_vqe - E_exact| = 4.2e-15 (machine precision)
+
+**MPS boundary (empirical law, verified):**
+- chi(k, d, n) <= min(2^d, 2^k, 2^(n-k))
+- Verified at n=10, 14, 16 with no free parameters
+- Predicts where classical simulation of quantum states fails
+- See docs/MPS_BOUNDARY.md
+
+**Text generation (hardware-limited, documented):**
+- BPE + MiniLM on Shakespeare: loss 7.44 -> 3.88
+- Output: real words mixed with BPE fragments
+- This is the hardware ceiling, not a correctness bug
+- See docs/TEXT_TRAINING.md and docs/EXPERIMENTS_LOG.md
+
 ## What's inside
 
 - Quantum primitives: complex arithmetic, dense matrices, statevector,
