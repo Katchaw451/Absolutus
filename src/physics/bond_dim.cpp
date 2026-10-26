@@ -81,8 +81,8 @@ static StateVector<double> make_random_circuit(size_t n, size_t depth,
 }
 
 int run_bond_dim(size_t n, int n_seeds, uint64_t seed) {
-    if (n < 2 || n > 16) {
-        std::fprintf(stderr, "bond_dim: n in [2,16], got %zu\n", n);
+    if (n < 2 || n > 20) {
+        std::fprintf(stderr, "bond_dim: n in [2,20], got %zu\n", n);
         return 1;
     }
     std::printf("state,n,seed,max_bond,profile\n");
