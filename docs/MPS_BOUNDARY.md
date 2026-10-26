@@ -88,30 +88,75 @@ min(1024, 128, 512) = 128, observed 128. k=6 (and k=10): 64, observed
 
 **The central cut deviates.** k=8 has formula ceiling min(1024, 256,
 256) = 256. Observed 200 (seed 0), 236 (seed 1). Both below ceiling.
-Two independent seeds agree on the deviation being non-trivial and
-below the theoretical maximum.
 
-Interpretation: the formula gives the *ceiling*, and random circuits
-*approach* it but do not necessarily reach it at finite depth. At
-n=16, d=10, the center cut is 6.25 = n/2 - 1.75 qubits from each end;
-the random circuit has had 10 layers to spread entanglement over 16
-qubits. The measured rank of 200-236 reflects that the distribution
-of Schmidt values is not yet flat: the top 200 are above threshold,
-but there are 56 more below 1e-10 that would be above in the d→∞ limit.
+### Verification at n=18 (1 seed, 9m14s)
 
-This is a real observation, not noise: 5 measurements at k=8 across
-2 seeds would not converge to < 256 by accident if the ceiling were
-reachable in d=10.
+| State | d | Profile |
+| :--- | :--- | :--- |
+| random | 3 | `1 2 4 8 8 8 8 8 8 8 8 8 8 8 8 8 4 2 1` |
+| random | 10 | `1 2 4 8 16 32 64 128 195 216 195 128 64 32 16 8 4 2 1` |
+
+Non-central cuts (k=1..7 and k=11..17) still match the formula
+exactly. Central cuts:
+
+- k=8: ceiling 256, observed **195** (24% deficit)
+- k=9: ceiling 512, observed **216** (58% deficit)
+- k=10: ceiling 256, observed **195** (24% deficit)
+
+## The saturation deficit grows with n
+
+| n | center k | ceiling min(2^d, 2^(n/2)) | observed | deficit |
+| :--- | :--- | :--- | :--- | :--- |
+| 10 | 5 | 32 | 32 | **0%** |
+| 14 | 7 | 128 | 128 | **0%** |
+| 16 | 8 | 256 | 200-236 | **8-22%** |
+| 18 | 9 | 512 | 216 | **58%** |
+
+At d=10 fixed, the deficit is zero for n ≤ 14, starts to appear at
+n=16, and is substantial at n=18. Saturation is not a property of
+depth alone; it degrades with n at constant depth.
+
+**The intuitive bound `d >= n/2` is not sufficient.** For this
+circuit family (random RY per qubit + CNOT chain, repeated d times),
+n=18 with d=10 satisfies `d > n/2 = 9` by one layer, yet reaches only
+216/512 = 42% of the ceiling. The circuit needs substantially more
+than n/2 layers for the Schmidt distribution at the center to
+approach flat.
+
+**Physical interpretation.** The CNOT chain has local interaction
+range: each layer propagates entanglement by one qubit of distance.
+After d layers, the light cone has radius ~d. For the center cut
+(k = n/2), the entanglement across the bipartition requires the two
+halves to have 'seen' each other for long enough that the reduced
+density matrix is close to maximally mixed. Empirically, this requires
+d > n/2 by a factor that itself grows with n. At n=18, d=10 is far
+from enough; a plausible rule of thumb is d ~ n, but the data is only
+three points (14, 16, 18) at one d.
+
+**What this means for classical simulability.** Circuit depth is not
+just a lower bound on chi. At a given depth, chi depends on where the
+cut is relative to the light-cone front. For circuits shallower than
+~n, the center of the chain is far from saturation and MPS with
+modest chi captures the state accurately. For circuits deeper than
+~n, the center saturates and chi = 2^(n/2). The crossover is where
+classical simulation of this circuit family becomes hard.
+
+This is a stronger empirical statement than 'chi <= min(...)'. It
+says something about *how close* random circuits come to that bound,
+as a function of (n, d). The 3-point deficit table is the first
+quantification on this hardware.
 
 ### Practical ceiling for this experiment
 
-n=16 is the practical maximum on the Acer for this method. Beyond it,
-the center-cut Jacobi matrix is 512×512 (n=18) and the cubic
-complexity pushes a single run above 10 minutes. Multi-seed at n=18
-would exceed any reasonable session. The 3-point verification at
-n=10, 14, 16 is sufficient to establish the formula; going further
-requires either a faster eigensolver (blocked, vectorized) or a
-bigger machine.
+n=18 is the practical maximum on the Ryzen 5 5625U for this method.
+A single seed takes 9m14s (one state at 512x512 Jacobi). Multi-seed
+at n=18 would take 30+ minutes. n=20 would require 1024x1024 Jacobi
+and take >1 hour per seed.
+
+Going further requires a faster eigensolver (Lanczos for the top-K
+eigenvalues would be 100x faster for this task, since we only need
+counts above threshold). That is out of scope for this session but
+is the natural next step for the experiment.
 
 ## What each row says
 
