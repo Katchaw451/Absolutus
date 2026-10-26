@@ -1,4 +1,4 @@
-# Absolutus
+# Absolutus_V1
 
 A from-scratch quantum simulator and hybrid quantum-classical transformer,
 written in pure C++17 on commodity hardware. No external frameworks, no
